@@ -4,85 +4,67 @@
 #include <string>
 #include <iostream>
 
-class JsonOut : public desc::Serializer
+class JsonOut
 {
-	enum class State : char { value, seqStart, mapStart, mapKey, mapValue, done };
-	std::vector<State> _stack;
 	std::ostream& _out;
-	void _next()
-	{
-		switch (_stack.back())
-		{
-		case State::value: 
-		case State::mapValue:
-			_out << ",\n" << _indent();
-			break;
-		case State::mapKey: 
-			_out << ": ";
-			break;
-		default:
-			_out << _indent();
-			break;
-		}
-	}
-	void _commit()
-	{
-		switch (_stack.back())
-		{
-		case State::seqStart: _stack.back() = State::value; return;
-		case State::mapStart: _stack.back() = State::mapKey; return;
-		case State::mapKey: _stack.back() = State::mapValue; return;
-		case State::mapValue: _stack.back() = State::mapKey; return;
-		default: return;
-		}
-	}
-	std::string _indent() const { return std::string((_stack.size() - 1) * 2, ' '); }
-public:
-	JsonOut(std::ostream& out) : _stack{ State::seqStart }, _out{ out } { }
+	int _indent = 0;
+	bool _break = false;
 
-	// Inherited via Serializer
-	virtual void beginSequence() override
+	template <class T, class MemberT>
+	void _write_member(const T& value, const desc::Member<T, MemberT>& member, bool first)
 	{
-		_next();
-		_stack.push_back(State::seqStart);
-		_out << "[\n";
+		if (!first) _out << ',';
+		write(member.name);
+		_out << ": ";
+		_break = false;
+		write(value.*member.offset);
 	}
-	virtual void endSequence() override
+
+	template <class T, class Last>
+	void _write_object(const T& value, const desc::MemberList<T, Last>& members, bool first)
 	{
-		_stack.pop_back();
-		_commit();
-		_out << "\n" << _indent() << "]";
+		_write_member(value, members.last, first);
 	}
-	virtual void beginMap() override
+
+	template <class T, class First, class... Rest>
+	void _write_object(const T& value, const desc::MemberList<T, First, Rest...>& members, bool first)
 	{
-		_next();
-		_stack.push_back(State::mapStart);
-		_out << "{\n";
+		_write_member(value, members.first, first);
+		_write_object(value, members.rest, false);
 	}
-	virtual void endMap() override
+
+	template <class T>
+	void _write(const T& value, const desc::ObjectDescription&)
 	{
-		_stack.pop_back();
-		_commit();
-		_out << "\n" << _indent() << "]";
+		static constexpr auto members = T::members();
+		_out << "{";
+		_break = true;
+		++_indent;
+		_write_object(value, members, true);
+		--_indent;
+		_newline();
+		_out << "}";
 	}
-	virtual void _write(std::string_view text) override
+	template <class T>
+	void _write(const T& value, const desc::ScalarDescription&)
 	{
-		_next();
-		_commit();
-		_out << '"' << text << '"';
-	}
-	virtual void _write(long long value) override
-	{
-		_next();
-		_commit();
 		_out << value;
 	}
-	virtual void _write(double value) override
+	void _newline()
 	{
-		_next();
-		_commit();
-		_out << value;
+		if (_break)
+		{
+			_out << '\n';
+			for (int left = _indent * 2; left > 0; --left)
+				_out << ' ';
+			_break = false;
+		}
 	}
+public:
+	JsonOut(std::ostream& out) : _out{ out } { }
+
+	template <class T>
+	void write(const T& value) { _newline(); _write(value, desc::Description<T>{}); _break = true; }
 };
 
 struct TestStruct
