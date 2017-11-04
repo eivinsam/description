@@ -52,6 +52,8 @@ namespace desc
 	struct Description<const char*> : ScalarDescription
 	{
 	};
+	template <class C, class T, class A>
+	struct Description<std::basic_string<C, T, A>> : ScalarDescription { };
 	template <class T>
 	struct Description<T, std::enable_if_t<std::is_arithmetic_v<T>>> : ScalarDescription
 	{
