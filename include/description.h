@@ -67,13 +67,13 @@ namespace desc
 	};
 
 	template <class T, class First, class... Rest>
-	MemberList<T, First, Rest...> members(Member<T, First> first, MemberList<T, Rest...> rest) { return { first, rest }; }
+	constexpr MemberList<T, First, Rest...> members(Member<T, First> first, MemberList<T, Rest...> rest) { return { first, rest }; }
 
 	template <class T, class Last>
-	auto members(const char* name, Last T::* offset) { return MemberList<T, Last>{ {name, offset} }; }
+	constexpr auto members(const char* name, Last T::* offset) { return MemberList<T, Last>{ {name, offset} }; }
 
 	template <class T, class First, class... Rest>
-	auto members(const char* first_name, First T::* first_offset, Rest&&... rest)
+	constexpr auto members(const char* first_name, First T::* first_offset, Rest&&... rest)
 	{
 		return members(Member<T, First>{ first_name, first_offset }, members(std::forward<Rest>(rest)...));
 	}
@@ -83,8 +83,9 @@ namespace desc
 	{
 		static void write(Serializer& out, const T& value)
 		{
+			static constexpr auto members = T::members();
 			out.beginMap();
-			T::members().write(out, value);
+			members.write(out, value);
 			out.endMap();
 		}
 	};

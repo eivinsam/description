@@ -90,7 +90,7 @@ struct TestStruct
 	int a;
 	float b;
 
-	static auto members()
+	static constexpr auto members()
 	{
 		return desc::members("a", &TestStruct::a, "b", &TestStruct::b);
 	}
